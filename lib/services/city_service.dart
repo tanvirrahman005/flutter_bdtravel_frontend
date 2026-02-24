@@ -33,7 +33,25 @@ class CityService {
     }
   }
 
-  // Create city (Admin only)
+  // Get active cities
+  Future<List<CityModel>> getActiveCities() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/cities/active'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map<CityModel>((json) => CityModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load active cities: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching active cities: $e');
+    }
+  }
   Future<Map<String, dynamic>> createCity(CityModel city) async {
     try {
       final headers = await _getHeaders();

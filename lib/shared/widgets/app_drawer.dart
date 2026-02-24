@@ -94,7 +94,9 @@ class _AppDrawerState extends State<AppDrawer> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          _role == 'ADMIN' ? '👑 Admin' : '👤 User',
+                          _role == 'ADMIN' 
+                              ? '👑 Admin' 
+                              : (_role == 'OPERATOR' ? '🛠️ Operator' : '👤 User'),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -166,6 +168,58 @@ class _AppDrawerState extends State<AppDrawer> {
                     icon: Icons.directions_bus,
                     title: 'Vehicles',
                     route: AppRoutes.vehicles,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.event_seat,
+                    title: 'Seat Layouts',
+                    route: AppRoutes.seatLayouts,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.map,
+                    title: 'Routes',
+                    route: AppRoutes.transportRoutes,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.schedule,
+                    title: 'Schedules',
+                    route: AppRoutes.schedules,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.book_online,
+                    title: 'Bookings',
+                    route: AppRoutes.adminBookings,
+                  ),
+                ],
+                
+                // Operator only section (if any separate)
+                if (_isLoggedIn && _role == 'OPERATOR') ...[
+                   _buildMenuItem(
+                    context,
+                    icon: Icons.event_seat,
+                    title: 'Seat Layouts',
+                    route: AppRoutes.seatLayouts,
+                  ),
+                   _buildMenuItem(
+                    context,
+                    icon: Icons.map,
+                    title: 'Routes',
+                    route: AppRoutes.transportRoutes,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.schedule,
+                    title: 'Schedules',
+                    route: AppRoutes.schedules,
+                  ),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.book_online,
+                    title: 'Bookings',
+                    route: AppRoutes.adminBookings,
                   ),
                 ],
                 

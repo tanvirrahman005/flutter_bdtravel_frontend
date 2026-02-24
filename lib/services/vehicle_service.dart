@@ -36,6 +36,26 @@ class VehicleService {
     }
   }
 
+  // Get active vehicles
+  Future<List<VehicleModel>> getActiveVehicles() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/vehicles/active'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map<VehicleModel>((json) => VehicleModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load active vehicles: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching active vehicles: $e');
+    }
+  }
+
   // Create vehicle (Admin only)
   Future<Map<String, dynamic>> createVehicle(VehicleModel vehicle) async {
     try {

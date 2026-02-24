@@ -15,4 +15,8 @@ class AppRoutes {
   static const String transportTypes = '/transport-types';
   static const String cities = '/cities';
   static const String vehicles = '/vehicles';
+  static const String seatLayouts = '/seat-layouts';
+  static const String transportRoutes = '/transport-routes';
+  static const String schedules = '/schedules';
+  static const String adminBookings = '/admin-bookings';
 }

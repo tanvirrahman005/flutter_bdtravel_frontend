@@ -16,6 +16,10 @@ import 'package:bd_travel/features/admin/screens/transport_company_list_screen.d
 import 'package:bd_travel/features/admin/screens/transport_type_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/city_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/vehicle_list_screen.dart';
+import 'package:bd_travel/features/admin/screens/seat_layout_list_screen.dart';
+import 'package:bd_travel/features/admin/screens/route_list_screen.dart';
+import 'package:bd_travel/features/admin/screens/schedule_list_screen.dart';
+import 'package:bd_travel/features/admin/screens/booking_list_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +111,26 @@ class MyApp extends StatelessWidget {
           case AppRoutes.vehicles:
             return MaterialPageRoute(
               builder: (_) => const VehicleListScreen(),
+              settings: settings,
+            );
+          case AppRoutes.seatLayouts:
+            return MaterialPageRoute(
+              builder: (_) => const SeatLayoutListScreen(),
+              settings: settings,
+            );
+          case AppRoutes.transportRoutes:
+            return MaterialPageRoute(
+              builder: (_) => const RouteListScreen(),
+              settings: settings,
+            );
+          case AppRoutes.schedules:
+            return MaterialPageRoute(
+              builder: (_) => const ScheduleListScreen(),
+              settings: settings,
+            );
+          case AppRoutes.adminBookings:
+            return MaterialPageRoute(
+              builder: (_) => const BookingListScreen(),
               settings: settings,
             );
           default:

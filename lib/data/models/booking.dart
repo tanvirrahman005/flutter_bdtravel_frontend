@@ -48,20 +48,30 @@ class Booking {
   }
 
   factory Booking.fromMap(Map<String, dynamic> map) {
+    return Booking.fromJson(map);
+  }
+
+  factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
-      id: map['id'],
-      bookingReference: map['bookingReference'] ?? '',
-      scheduleId: map['scheduleId'] ?? 0,
-      passengerName: map['passengerName'] ?? '',
-      passengerPhone: map['passengerPhone'] ?? '',
-      passengerEmail: map['passengerEmail'],
-      totalAmount: (map['totalAmount'] ?? 0).toDouble(),
-      bookingStatus: map['bookingStatus'] ?? 'PENDING',
-      bookingDate: DateTime.parse(map['bookingDate']),
-      fromCity: map['fromCity'] ?? '',
-      toCity: map['toCity'] ?? '',
-      journeyDate: DateTime.parse(map['journeyDate']),
-      seatNumbers: (map['seatNumbers'] as String).split(','),
+      id: json['id'],
+      bookingReference: json['bookingReference'] ?? '',
+      scheduleId: json['scheduleId'] ?? (json['schedule'] != null ? json['schedule']['id'] : 0),
+      passengerName: json['passengerName'] ?? '',
+      passengerPhone: json['passengerPhone'] ?? '',
+      passengerEmail: json['passengerEmail'],
+      totalAmount: (json['totalAmount'] ?? 0).toDouble(),
+      bookingStatus: json['bookingStatus'] ?? 'PENDING',
+      bookingDate: DateTime.parse(json['bookingDate']),
+      fromCity: json['fromCity'] ?? (json['schedule'] != null && json['schedule']['route'] != null ? json['schedule']['route']['startCity']['name'] : ''),
+      toCity: json['toCity'] ?? (json['schedule'] != null && json['schedule']['route'] != null ? json['schedule']['route']['endCity']['name'] : ''),
+      journeyDate: DateTime.parse(json['journeyDate'] ?? (json['schedule'] != null ? json['schedule']['departureTime'] : json['bookingDate'])),
+      seatNumbers: json['seatNumbers'] != null 
+          ? (json['seatNumbers'] is String ? (json['seatNumbers'] as String).split(',') : (json['seatNumbers'] as List).cast<String>())
+          : (json['seats'] != null ? (json['seats'] as List).map((s) => s['seatLayout']['seatNumber'] as String).toList() : []),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return toMap();
   }
 }
