@@ -124,7 +124,9 @@ class _ScheduleFormDialogState extends State<ScheduleFormDialog> {
       departureTime: _departureDateTime!,
       arrivalTime: _arrivalDateTime!,
       basePrice: double.parse(_priceController.text),
-      availableSeats: widget.schedule?.availableSeats ?? _selectedVehicle!.totalSeats,
+      availableSeats: widget.schedule?.id != 0 && widget.schedule?.vehicle.id == _selectedVehicle!.id
+          ? widget.schedule!.availableSeats
+          : _selectedVehicle!.totalSeats,
       status: _status,
     );
 

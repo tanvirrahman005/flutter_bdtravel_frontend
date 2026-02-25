@@ -10,7 +10,10 @@ import 'package:bd_travel/features/bookings/screens/my_bookings_screen.dart';
 import 'package:bd_travel/features/search/screens/search_results_screen.dart';
 import 'package:bd_travel/features/booking/screens/seat_selection_screen.dart';
 import 'package:bd_travel/features/booking/screens/booking_form_screen.dart';
-import 'package:bd_travel/data/models/schedule.dart';
+import 'package:bd_travel/features/booking/screens/payment_screen.dart';
+import 'package:bd_travel/data/models/booking.dart';
+import 'package:bd_travel/data/models/schedule_model.dart';
+import 'package:bd_travel/data/models/seat_layout_model.dart';
 import 'package:bd_travel/features/admin/screens/user_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/transport_company_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/transport_type_list_screen.dart';
@@ -67,14 +70,18 @@ class MyApp extends StatelessWidget {
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
               builder: (_) => SearchResultsScreen(
-                fromCity: args['fromCity'] as String,
-                toCity: args['toCity'] as String,
-                journeyDate: args['journeyDate'] as DateTime,
+                fromCityId: args['fromCityId'],
+                fromCityName: args['fromCityName'],
+                toCityId: args['toCityId'],
+                toCityName: args['toCityName'],
+                journeyDate: args['journeyDate'],
+                transportTypeId: args['transportTypeId'],
+                transportTypeName: args['transportTypeName'],
               ),
               settings: settings,
             );
           case AppRoutes.seatSelection:
-            final schedule = settings.arguments as Schedule;
+            final schedule = settings.arguments as ScheduleModel;
             return MaterialPageRoute(
               builder: (_) => SeatSelectionScreen(schedule: schedule),
               settings: settings,
@@ -83,9 +90,15 @@ class MyApp extends StatelessWidget {
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
               builder: (_) => BookingFormScreen(
-                schedule: args['schedule'] as Schedule,
-                selectedSeats: args['selectedSeats'] as List<String>,
+                schedule: args['schedule'] as ScheduleModel,
+                selectedSeats: (args['selectedSeats'] as List).cast<SeatLayoutModel>(),
               ),
+              settings: settings,
+            );
+          case AppRoutes.payment:
+            final booking = settings.arguments as Booking;
+            return MaterialPageRoute(
+              builder: (_) => PaymentScreen(booking: booking),
               settings: settings,
             );
           case AppRoutes.userList:

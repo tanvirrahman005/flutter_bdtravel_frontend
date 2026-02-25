@@ -135,4 +135,24 @@ class SeatLayoutService {
       return {'success': false, 'message': 'Error updating seat availability: $e'};
     }
   }
+
+  // Get booked seats by schedule
+  Future<List<SeatLayoutModel>> getBookedSeatsBySchedule(int scheduleId) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/bookings/schedule/$scheduleId/booked-seats'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map<SeatLayoutModel>((json) => SeatLayoutModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load booked seats: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching booked seats: $e');
+    }
+  }
 }

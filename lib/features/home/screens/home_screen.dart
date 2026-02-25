@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:bd_travel/core/constants/app_colors.dart';
 import 'package:bd_travel/core/constants/app_strings.dart';
 import 'package:bd_travel/core/constants/app_routes.dart';
-import 'package:bd_travel/data/local/database_helper.dart';
-import 'package:bd_travel/data/models/city.dart';
+import 'package:bd_travel/data/models/city_model.dart';
+import 'package:bd_travel/data/models/transport_type_model.dart';
 import 'package:bd_travel/shared/widgets/app_drawer.dart';
 import 'package:bd_travel/services/auth_service.dart';
+import 'package:bd_travel/services/city_service.dart';
+import 'package:bd_travel/services/transport_type_service.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,23 +18,42 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-  List<City> _cities = [];
-  City? _fromCity;
-  City? _toCity;
+  final CityService _cityService = CityService();
+  final TransportTypeService _transportTypeService = TransportTypeService();
+  
+  List<CityModel> _cities = [];
+  List<TransportTypeModel> _transportTypes = [];
+  
+  CityModel? _fromCity;
+  CityModel? _toCity;
+  TransportTypeModel? _selectedTransportType;
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadCities();
+    _loadInitialData();
   }
 
-  Future<void> _loadCities() async {
-    final cities = await _dbHelper.getAllCities();
-    setState(() {
-      _cities = cities;
-    });
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    try {
+      final cities = await _cityService.getActiveCities();
+      final types = await _transportTypeService.getAllTransportTypes();
+      setState(() {
+        _cities = cities;
+        _transportTypes = types;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -96,9 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       AppRoutes.searchResults,
       arguments: {
-        'fromCity': _fromCity!.name,
-        'toCity': _toCity!.name,
+        'fromCityId': _fromCity!.id,
+        'fromCityName': _fromCity!.name,
+        'toCityId': _toCity!.id,
+        'toCityName': _toCity!.name,
         'journeyDate': _selectedDate,
+        'transportTypeId': _selectedTransportType?.id,
+        'transportTypeName': _selectedTransportType?.name,
       },
     );
   }
@@ -108,20 +133,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       drawer: const AppDrawer(),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              _buildSearchCard(),
-              const SizedBox(height: 32),
-              _buildPopularRoutes(),
-              const SizedBox(height: 24),
-              _buildQuickActions(),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    _buildSearchCard(),
+                    const SizedBox(height: 32),
+                    _buildQuickActions(),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -164,13 +189,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               IconButton(
                 onPressed: () async {
-                  // Check if user is logged in
                   final authService = AuthService();
                   final isLoggedIn = await authService.isLoggedIn();
-                  
                   if (!mounted) return;
-                  
-                  // Navigate to login if not logged in, otherwise to profile
                   if (isLoggedIn) {
                     Navigator.pushNamed(context, AppRoutes.profile);
                   } else {
@@ -217,15 +238,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Column(
           children: [
-            // From City
             _buildCitySelector(
               label: AppStrings.fromCity,
               icon: Icons.trip_origin,
               selectedCity: _fromCity,
               onTap: () => _showCityPicker(true),
             ),
-
-            // Swap Button
             Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -239,18 +257,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
-            // To City
             _buildCitySelector(
               label: AppStrings.toCity,
               icon: Icons.location_on,
               selectedCity: _toCity,
               onTap: () => _showCityPicker(false),
             ),
-
             const SizedBox(height: 16),
-
-            // Journey Date
             InkWell(
               onTap: () => _selectDate(context),
               borderRadius: BorderRadius.circular(12),
@@ -279,15 +292,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            AppStrings.journeyDate,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          Text(AppStrings.journeyDate, style: Theme.of(context).textTheme.bodySmall),
                           const SizedBox(height: 4),
                           Text(
-                            DateFormat(
-                              'EEE, dd MMM yyyy',
-                            ).format(_selectedDate),
+                            DateFormat('EEE, dd MMM yyyy').format(_selectedDate),
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ],
@@ -297,10 +305,51 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
+            const SizedBox(height: 16),
+            // Transport Type Selector
+            InkWell(
+              onTap: _showTransportTypePicker,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Transport Type', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            _selectedTransportType?.name ?? 'All Types',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
-
-            // Search Button
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -312,17 +361,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.search, size: 24),
-                    const SizedBox(width: 8),
+                    Icon(Icons.search, size: 24),
+                    SizedBox(width: 8),
                     Text(
                       AppStrings.searchBuses,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -337,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCitySelector({
     required String label,
     required IconData icon,
-    required City? selectedCity,
+    required CityModel? selectedCity,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -369,9 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     selectedCity?.name ?? AppStrings.selectCity,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: selectedCity != null
-                          ? AppColors.textPrimary
-                          : AppColors.textHint,
+                      color: selectedCity != null ? AppColors.textPrimary : AppColors.textHint,
                     ),
                   ),
                 ],
@@ -410,10 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Padding(
               padding: const EdgeInsets.all(20),
-              child: Text(
-                AppStrings.selectCity,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              child: Text(AppStrings.selectCity, style: Theme.of(context).textTheme.headlineSmall),
             ),
             Flexible(
               child: ListView.separated(
@@ -440,13 +481,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.location_city,
-                        color: AppColors.primary,
-                      ),
+                      child: const Icon(Icons.location_city, color: AppColors.primary),
                     ),
                     title: Text(city.name),
-                    subtitle: Text(city.code),
+                    subtitle: Text(city.code ?? ''),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   );
                 },
@@ -459,61 +497,64 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPopularRoutes() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                AppStrings.popularRoutes,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              TextButton(
-                onPressed: () {
-                  // TODO: View all routes
-                },
-                child: const Text('View All'),
-              ),
-            ],
+  void _showTransportTypePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 140,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildRouteCard(
-                  'Dhaka',
-                  'Chittagong',
-                  '800 BDT',
-                  Icons.directions_bus,
-                ),
-                _buildRouteCard(
-                  'Dhaka',
-                  'Sylhet',
-                  '600 BDT',
-                  Icons.directions_bus,
-                ),
-                _buildRouteCard(
-                  'Dhaka',
-                  "Cox's Bazar",
-                  '1200 BDT',
-                  Icons.directions_bus,
-                ),
-                _buildRouteCard(
-                  'Dhaka',
-                  'Rajshahi',
-                  '550 BDT',
-                  Icons.directions_bus,
-                ),
-              ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-        ],
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text('Select Transport Type', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  ListTile(
+                    onTap: () {
+                      setState(() => _selectedTransportType = null);
+                      Navigator.pop(context);
+                    },
+                    leading: const Icon(Icons.apps, color: AppColors.primary),
+                    title: const Text('All Types'),
+                    trailing: _selectedTransportType == null ? const Icon(Icons.check, color: AppColors.primary) : null,
+                  ),
+                  const Divider(height: 1),
+                  ..._transportTypes.map((type) => ListTile(
+                    onTap: () {
+                      setState(() => _selectedTransportType = type);
+                      Navigator.pop(context);
+                    },
+                    leading: const Icon(Icons.directions_bus, color: AppColors.primary),
+                    title: Text(type.name),
+                    trailing: _selectedTransportType?.id == type.id ? const Icon(Icons.check, color: AppColors.primary) : null,
+                  )).toList(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

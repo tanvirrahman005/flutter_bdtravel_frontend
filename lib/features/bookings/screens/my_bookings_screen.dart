@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:bd_travel/core/constants/app_colors.dart';
-import 'package:bd_travel/data/local/database_helper.dart';
+import 'package:bd_travel/core/constants/app_routes.dart';
+import 'package:bd_travel/services/booking_service.dart';
 import 'package:bd_travel/data/models/booking.dart';
 import 'package:bd_travel/shared/widgets/app_drawer.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -13,66 +15,50 @@ class MyBookingsScreen extends StatefulWidget {
 }
 
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+  final BookingService _bookingService = BookingService();
   List<Booking> _bookings = [];
   bool _isLoading = true;
+  String? _errorMessage;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _loadBookings();
+    _startTimer();
   }
 
-  Future<void> _loadBookings() async {
-    setState(() => _isLoading = true);
-    
-    // Create demo bookings if none exist
-    final bookings = await _dbHelper.getAllBookings();
-    if (bookings.isEmpty) {
-      await _createDemoBookings();
-    }
-    
-    final loadedBookings = await _dbHelper.getAllBookings();
-    setState(() {
-      _bookings = loadedBookings;
-      _isLoading = false;
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {}); // Refresh UI for the timers
+      }
     });
   }
 
-  Future<void> _createDemoBookings() async {
-    final demoBookings = [
-      Booking(
-        bookingReference: 'BT${DateTime.now().millisecondsSinceEpoch}',
-        scheduleId: 1,
-        passengerName: 'John Doe',
-        passengerPhone: '+8801712345678',
-        passengerEmail: 'john@example.com',
-        totalAmount: 1600.0,
-        bookingStatus: 'CONFIRMED',
-        bookingDate: DateTime.now().subtract(const Duration(days: 2)),
-        fromCity: 'Dhaka',
-        toCity: 'Chittagong',
-        journeyDate: DateTime.now().add(const Duration(days: 3)),
-        seatNumbers: ['A1', 'A2'],
-      ),
-      Booking(
-        bookingReference: 'BT${DateTime.now().millisecondsSinceEpoch + 1}',
-        scheduleId: 2,
-        passengerName: 'Jane Smith',
-        passengerPhone: '+8801812345679',
-        passengerEmail: 'jane@example.com',
-        totalAmount: 600.0,
-        bookingStatus: 'PENDING',
-        bookingDate: DateTime.now().subtract(const Duration(hours: 5)),
-        fromCity: 'Dhaka',
-        toCity: 'Sylhet',
-        journeyDate: DateTime.now().add(const Duration(days: 1)),
-        seatNumbers: ['B3'],
-      ),
-    ];
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
-    for (var booking in demoBookings) {
-      await _dbHelper.createBooking(booking);
+  Future<void> _loadBookings() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final loadedBookings = await _bookingService.getMyBookings();
+      setState(() {
+        _bookings = loadedBookings;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
     }
   }
 
@@ -131,7 +117,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.home),
             child: const Text('Book a Ticket'),
           ),
         ],
@@ -184,6 +170,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   ),
                 ),
                 const Spacer(),
+                if (booking.bookingStatus == 'PENDING') _buildTimer(booking.bookingDate),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
@@ -303,6 +290,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                         child: const Text('Download'),
                       ),
                     ),
+                    if (booking.bookingStatus == 'PENDING') ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRoutes.payment,
+                              arguments: booking,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                          ),
+                          child: const Text('Pay Now'),
+                        ),
+                      ),
+                    ],
                     if (booking.bookingStatus == 'CONFIRMED') ...[
                       const SizedBox(width: 12),
                       Expanded(
@@ -372,20 +377,74 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _dbHelper.updateBookingStatus(booking.id!, 'CANCELLED');
-              Navigator.pop(context);
-              _loadBookings();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Booking cancelled successfully'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
+              try {
+                await _bookingService.cancelBooking(booking.id!);
+                Navigator.pop(context);
+                _loadBookings();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Booking cancelled successfully'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error cancelling booking: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimer(DateTime bookingDate) {
+    final expiryTime = bookingDate.add(const Duration(minutes: 30));
+    final remaining = expiryTime.difference(DateTime.now());
+
+    if (remaining.isNegative) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Text(
+          'Expired',
+          style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+      );
+    }
+
+    final minutes = remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = remaining.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer, size: 14, color: AppColors.warning),
+          const SizedBox(width: 4),
+          Text(
+            '$minutes:$seconds',
+            style: const TextStyle(
+              color: AppColors.warning,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
           ),
         ],
       ),

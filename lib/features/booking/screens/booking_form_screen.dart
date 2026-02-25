@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:bd_travel/core/constants/app_colors.dart';
-import 'package:bd_travel/data/models/schedule.dart';
+import 'package:bd_travel/data/models/schedule_model.dart';
+import 'package:bd_travel/data/models/seat_layout_model.dart';
+import 'package:bd_travel/services/booking_service.dart';
+import 'package:bd_travel/data/models/booking.dart';
+import 'package:bd_travel/core/constants/app_routes.dart';
 import 'package:intl/intl.dart';
 
 class BookingFormScreen extends StatefulWidget {
-  final Schedule schedule;
-  final List<String> selectedSeats;
+  final ScheduleModel schedule;
+  final List<SeatLayoutModel> selectedSeats;
 
   const BookingFormScreen({
     super.key,
@@ -23,8 +27,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _nidController = TextEditingController();
+  final BookingService _bookingService = BookingService();
   String _selectedGender = 'Male';
-  String _paymentMethod = 'bKash';
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -35,77 +40,46 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     super.dispose();
   }
 
-  double get totalAmount => widget.selectedSeats.length * widget.schedule.fare;
+  double get totalAmount => widget.selectedSeats.length * widget.schedule.basePrice;
 
-  void _confirmBooking() {
+  Future<void> _confirmBooking() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Save booking to database
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: AppColors.success,
-                  size: 64,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Booking Confirmed!',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Reference: BT${DateTime.now().millisecondsSinceEpoch}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Your ticket has been booked successfully!',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).popUntil((route) => route.isFirst); // Back to home
-              },
-              child: const Text('View Bookings'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).popUntil((route) => route.isFirst); // Back to home
-              },
-              child: const Text('Done'),
-            ),
-          ],
-        ),
-      );
+      setState(() => _isSubmitting = true);
+      
+      try {
+        final List<Map<String, dynamic>> seatData = widget.selectedSeats
+            .map((s) => {
+                  'seatLayoutId': s.id,
+                  'seatPrice': widget.schedule.basePrice,
+                })
+            .toList();
+
+        final booking = await _bookingService.createBookingWithSeats(
+          scheduleId: widget.schedule.id,
+          selectedSeats: seatData,
+          passengerName: _nameController.text.trim(),
+          passengerPhone: _phoneController.text.trim(),
+          passengerEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+          passengerNid: _nidController.text.trim().isEmpty ? null : _nidController.text.trim(),
+          totalAmount: totalAmount,
+        );
+
+        if (!mounted) return;
+        
+        // Navigate to payment screen
+        Navigator.popAndPushNamed(
+          context,
+          AppRoutes.payment,
+          arguments: booking,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      } finally {
+        if (mounted) setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -230,30 +204,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Payment Method
-                    _buildSectionTitle('Payment Method'),
-                    const SizedBox(height: 16),
-                    _buildPaymentOption(
-                      'bKash',
-                      Icons.phone_android,
-                      AppColors.accent,
-                    ),
-                    _buildPaymentOption(
-                      'Nagad',
-                      Icons.account_balance_wallet,
-                      AppColors.warning,
-                    ),
-                    _buildPaymentOption(
-                      'Rocket',
-                      Icons.rocket_launch,
-                      AppColors.info,
-                    ),
-                    _buildPaymentOption(
-                      'Cash',
-                      Icons.money,
-                      AppColors.success,
-                    ),
-
                     const SizedBox(height: 24),
 
                     // Fare Breakdown
@@ -282,21 +232,30 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _confirmBooking,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Confirm Booking',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '৳${totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
+                  onPressed: _isSubmitting ? null : _confirmBooking,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Proceed to Payment',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '৳${totalAmount.toStringAsFixed(0)}',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -338,7 +297,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.schedule.companyName,
+                      widget.schedule.vehicle.transportCompany.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -346,7 +305,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       ),
                     ),
                     Text(
-                      widget.schedule.busType,
+                      widget.schedule.vehicle.transportType.name,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -371,7 +330,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                     ),
                     Text(
-                      widget.schedule.fromCity,
+                      widget.schedule.route.startCity.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -395,7 +354,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
                     ),
                     Text(
-                      widget.schedule.toCity,
+                      widget.schedule.route.endCity.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -426,7 +385,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     const Icon(Icons.event_seat, size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
                     Text(
-                      'Seats: ${widget.selectedSeats.join(", ")}',
+                      'Seats: ${widget.selectedSeats.map((s) => s.seatNumber).join(", ")}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -461,60 +420,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     );
   }
 
-  Widget _buildPaymentOption(String method, IconData icon, Color color) {
-    final isSelected = _paymentMethod == method;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _paymentMethod = method;
-          });
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.1) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? color : AppColors.divider,
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                method,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? color : AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              if (isSelected)
-                Icon(Icons.check_circle, color: color, size: 24)
-              else
-                Icon(Icons.circle_outlined, color: AppColors.textHint, size: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildFareBreakdown() {
-    final farePerSeat = widget.schedule.fare;
+    final farePerSeat = widget.schedule.basePrice;
     final numberOfSeats = widget.selectedSeats.length;
     final subtotal = farePerSeat * numberOfSeats;
     const serviceFee = 20.0;

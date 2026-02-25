@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:bd_travel/core/constants/app_colors.dart';
 import 'package:bd_travel/core/constants/app_routes.dart';
-import 'package:bd_travel/data/local/database_helper.dart';
-import 'package:bd_travel/data/models/schedule.dart';
+import 'package:bd_travel/data/models/schedule_model.dart';
+import 'package:bd_travel/services/search_service.dart';
 import 'package:intl/intl.dart';
 
 class SearchResultsScreen extends StatefulWidget {
-  final String fromCity;
-  final String toCity;
+  final int fromCityId;
+  final String fromCityName;
+  final int toCityId;
+  final String toCityName;
   final DateTime journeyDate;
+  final int? transportTypeId;
+  final String? transportTypeName;
 
   const SearchResultsScreen({
     super.key,
-    required this.fromCity,
-    required this.toCity,
+    required this.fromCityId,
+    required this.fromCityName,
+    required this.toCityId,
+    required this.toCityName,
     required this.journeyDate,
+    this.transportTypeId,
+    this.transportTypeName,
   });
 
   @override
@@ -22,9 +30,10 @@ class SearchResultsScreen extends StatefulWidget {
 }
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-  List<Schedule> _schedules = [];
+  final SearchService _searchService = SearchService();
+  List<ScheduleModel> _schedules = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -33,12 +42,27 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Future<void> _searchSchedules() async {
-    setState(() => _isLoading = true);
-    final schedules = await _dbHelper.searchSchedules(widget.fromCity, widget.toCity);
     setState(() {
-      _schedules = schedules;
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
     });
+    try {
+      final schedules = await _searchService.searchSchedules(
+        fromCityId: widget.fromCityId,
+        toCityId: widget.toCityId,
+        journeyDate: widget.journeyDate,
+        transportTypeId: widget.transportTypeId,
+      );
+      setState(() {
+        _schedules = schedules;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   @override
@@ -49,11 +73,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${widget.fromCity} → ${widget.toCity}',
+              '${widget.fromCityName} → ${widget.toCityName}',
               style: const TextStyle(fontSize: 16),
             ),
             Text(
-              DateFormat('dd MMM yyyy').format(widget.journeyDate),
+              '${DateFormat('dd MMM yyyy').format(widget.journeyDate)}${widget.transportTypeName != null ? ' • ${widget.transportTypeName}' : ''}',
               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
@@ -63,15 +87,32 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _schedules.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _schedules.length,
-                  itemBuilder: (context, index) {
-                    return _buildScheduleCard(_schedules[index]);
-                  },
-                ),
+          : _errorMessage != null
+              ? _buildErrorState()
+              : _schedules.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _schedules.length,
+                      itemBuilder: (context, index) {
+                        return _buildScheduleCard(_schedules[index]);
+                      },
+                    ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(_errorMessage ?? 'Unknown error occurred'),
+          const SizedBox(height: 16),
+          ElevatedButton(onPressed: _searchSchedules, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 
@@ -113,7 +154,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
-  Widget _buildScheduleCard(Schedule schedule) {
+  Widget _buildScheduleCard(ScheduleModel schedule) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -161,7 +202,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        schedule.companyName,
+                        schedule.vehicle.transportCompany.name,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -171,9 +212,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          _buildBadge(schedule.busType, AppColors.primary),
+                          _buildBadge(schedule.vehicle.transportType.name, AppColors.primary),
                           const SizedBox(width: 8),
-                          _buildBadge('${schedule.availableSeats} seats', AppColors.success),
+                          _buildBadge('${schedule.availableSeats}/${schedule.vehicle.totalSeats} seats', AppColors.success),
                         ],
                       ),
                     ],
@@ -204,7 +245,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            schedule.fromCity,
+                            schedule.route.startCity.name,
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary,
@@ -213,13 +254,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ],
                       ),
                     ),
-                    Column(
+                    const Column(
                       children: [
-                        const Icon(Icons.arrow_forward, color: AppColors.primary),
-                        const SizedBox(height: 4),
+                        Icon(Icons.arrow_forward, color: AppColors.primary),
+                        SizedBox(height: 4),
                         Text(
-                          schedule.duration,
-                          style: const TextStyle(
+                          'Direct',
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
@@ -240,7 +281,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            schedule.toCity,
+                            schedule.route.endCity.name,
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary,
@@ -271,7 +312,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '৳${schedule.fare.toStringAsFixed(0)}',
+                          '৳${schedule.basePrice.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -332,3 +373,23 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 }
+
+  Widget _buildBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+
