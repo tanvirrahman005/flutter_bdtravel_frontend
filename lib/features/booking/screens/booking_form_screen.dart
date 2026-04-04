@@ -40,18 +40,21 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     super.dispose();
   }
 
-  double get totalAmount => widget.selectedSeats.length * widget.schedule.basePrice;
+  double get totalAmount =>
+      (widget.selectedSeats.length * widget.schedule.basePrice) + 20;
 
   Future<void> _confirmBooking() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
-      
+
       try {
         final List<Map<String, dynamic>> seatData = widget.selectedSeats
-            .map((s) => {
-                  'seatLayoutId': s.id,
-                  'seatPrice': widget.schedule.basePrice,
-                })
+            .map(
+              (s) => {
+                'seatLayoutId': s.id,
+                'seatPrice': widget.schedule.basePrice,
+              },
+            )
             .toList();
 
         final booking = await _bookingService.createBookingWithSeats(
@@ -59,13 +62,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           selectedSeats: seatData,
           passengerName: _nameController.text.trim(),
           passengerPhone: _phoneController.text.trim(),
-          passengerEmail: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
-          passengerNid: _nidController.text.trim().isEmpty ? null : _nidController.text.trim(),
+          passengerEmail: _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
+          passengerNid: _nidController.text.trim().isEmpty
+              ? null
+              : _nidController.text.trim(),
           totalAmount: totalAmount,
         );
 
         if (!mounted) return;
-        
+
         // Navigate to payment screen
         Navigator.popAndPushNamed(
           context,
@@ -75,7 +82,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       } finally {
         if (mounted) setState(() => _isSubmitting = false);
@@ -239,20 +249,28 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
-                              'Proceed to Payment',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              'Confirm Booking And ',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               '৳${totalAmount.toStringAsFixed(0)}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -289,7 +307,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.directions_bus, color: Colors.white, size: 24),
+                child: const Icon(
+                  Icons.directions_bus,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -327,7 +349,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   children: [
                     const Text(
                       'From',
-                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     Text(
                       widget.schedule.route.startCity.name,
@@ -338,8 +363,13 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       ),
                     ),
                     Text(
-                      DateFormat('dd MMM, hh:mm a').format(widget.schedule.departureTime),
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      DateFormat(
+                        'dd MMM, hh:mm a',
+                      ).format(widget.schedule.departureTime),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -351,7 +381,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                   children: [
                     const Text(
                       'To',
-                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     Text(
                       widget.schedule.route.endCity.name,
@@ -363,7 +396,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     ),
                     Text(
                       DateFormat('hh:mm a').format(widget.schedule.arrivalTime),
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -382,7 +418,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.event_seat, size: 16, color: AppColors.primary),
+                    const Icon(
+                      Icons.event_seat,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Seats: ${widget.selectedSeats.map((s) => s.seatNumber).join(", ")}',
@@ -419,7 +459,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       ),
     );
   }
-
 
   Widget _buildFareBreakdown() {
     final farePerSeat = widget.schedule.basePrice;

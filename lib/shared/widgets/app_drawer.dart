@@ -129,15 +129,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     context,
                     icon: Icons.admin_panel_settings,
                     title: 'Admin Dashboard',
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Admin Dashboard - Coming Soon'),
-                          backgroundColor: AppColors.info,
-                        ),
-                      );
-                    },
+                    route: AppRoutes.adminDashboard,
                   ),
                   _buildMenuItem(
                     context,

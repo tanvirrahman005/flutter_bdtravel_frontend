@@ -12,6 +12,7 @@ class Booking {
   final String toCity;
   final DateTime journeyDate;
   final List<String> seatNumbers;
+  final String? paymentPhone;
 
   Booking({
     this.id,
@@ -27,6 +28,7 @@ class Booking {
     required this.toCity,
     required this.journeyDate,
     required this.seatNumbers,
+    this.paymentPhone,
   });
 
   Map<String, dynamic> toMap() {
@@ -44,6 +46,7 @@ class Booking {
       'toCity': toCity,
       'journeyDate': journeyDate.toIso8601String(),
       'seatNumbers': seatNumbers.join(','),
+      'paymentPhone': paymentPhone,
     };
   }
 
@@ -68,6 +71,7 @@ class Booking {
       seatNumbers: json['seatNumbers'] != null 
           ? (json['seatNumbers'] is String ? (json['seatNumbers'] as String).split(',') : (json['seatNumbers'] as List).cast<String>())
           : (json['seats'] != null ? (json['seats'] as List).map((s) => s['seatLayout']['seatNumber'] as String).toList() : []),
+      paymentPhone: json['paymentPhone'],
     );
   }
 

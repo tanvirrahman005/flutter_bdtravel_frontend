@@ -103,11 +103,16 @@ class BookingService {
   }
 
   // Update booking status
-  Future<Booking> updateBookingStatus(int bookingId, String status) async {
+  Future<Booking> updateBookingStatus(int bookingId, String status, {String? paymentPhone}) async {
     try {
       final headers = await _getHeaders();
+      String url = '${ApiConfig.baseUrl}/api/bookings/$bookingId/status?status=$status';
+      if (paymentPhone != null && paymentPhone.isNotEmpty) {
+        url += '&paymentPhone=$paymentPhone';
+      }
+
       final response = await http.patch(
-        Uri.parse('${ApiConfig.baseUrl}/api/bookings/$bookingId/status?status=$status'),
+        Uri.parse(url),
         headers: headers,
       );
 
@@ -135,6 +140,25 @@ class BookingService {
       }
     } catch (e) {
       throw Exception('Error cancelling booking: $e');
+    }
+  }
+
+  // Download ticket PDF
+  Future<List<int>> downloadTicketPdf(int id) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/bookings/$id/ticket'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        throw Exception('Failed to download ticket: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error downloading ticket: $e');
     }
   }
 }

@@ -6,6 +6,8 @@ import 'package:bd_travel/data/models/booking.dart';
 import 'package:bd_travel/shared/widgets/app_drawer.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -40,6 +42,53 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _downloadTicket(Booking booking) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloading ticket for ${booking.bookingReference}...')),
+      );
+
+      final bytes = await _bookingService.downloadTicketPdf(booking.id!);
+      
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        throw Exception('Could not access storage directory');
+      }
+
+      final filePath = '${directory.path}/ticket-${booking.bookingReference}.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ticket saved to: $filePath'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to download ticket: $e'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   Future<void> _loadBookings() async {
@@ -274,22 +323,16 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 // Action Buttons
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Download ticket - Coming Soon'),
-                              backgroundColor: AppColors.info,
-                            ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primary),
+                    if (booking.bookingStatus == 'CONFIRMED')
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _downloadTicket(booking),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary),
+                          ),
+                          child: const Text('Download'),
                         ),
-                        child: const Text('Download'),
                       ),
-                    ),
                     if (booking.bookingStatus == 'PENDING') ...[
                       const SizedBox(width: 12),
                       Expanded(

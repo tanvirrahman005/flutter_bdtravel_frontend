@@ -16,18 +16,36 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   final BookingService _bookingService = BookingService();
+  final TextEditingController _phoneController = TextEditingController();
   bool _isProcessing = false;
   String _paymentMethod = 'bKash';
 
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
   Future<void> _processPayment() async {
+    if (_phoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your phone number'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
     
     try {
       // Simulate payment processing delay
       await Future.delayed(const Duration(seconds: 2));
       
-      // Update booking status to CONFIRMED
-      await _bookingService.updateBookingStatus(widget.booking.id!, 'CONFIRMED');
+      // Update booking status to CONFIRMED with payment phone
+      await _bookingService.updateBookingStatus(
+        widget.booking.id!, 
+        'CONFIRMED', 
+        paymentPhone: _phoneController.text,
+      );
       
       if (!mounted) return;
       
@@ -170,7 +188,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
             const SizedBox(height: 32),
 
-            // Action Buttons
+            // Phone Number Field
+            _buildSectionTitle('Payment Account Number'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: 'Enter your $_paymentMethod number',
+                prefixIcon: const Icon(Icons.phone),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               height: 56,

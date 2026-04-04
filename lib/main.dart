@@ -23,6 +23,7 @@ import 'package:bd_travel/features/admin/screens/seat_layout_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/route_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/schedule_list_screen.dart';
 import 'package:bd_travel/features/admin/screens/booking_list_screen.dart';
+import 'package:bd_travel/features/admin/screens/admin_dashboard_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -91,7 +92,8 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(
               builder: (_) => BookingFormScreen(
                 schedule: args['schedule'] as ScheduleModel,
-                selectedSeats: (args['selectedSeats'] as List).cast<SeatLayoutModel>(),
+                selectedSeats: (args['selectedSeats'] as List)
+                    .cast<SeatLayoutModel>(),
               ),
               settings: settings,
             );
@@ -144,6 +146,11 @@ class MyApp extends StatelessWidget {
           case AppRoutes.adminBookings:
             return MaterialPageRoute(
               builder: (_) => const BookingListScreen(),
+              settings: settings,
+            );
+          case AppRoutes.adminDashboard:
+            return MaterialPageRoute(
+              builder: (_) => const AdminDashboardScreen(),
               settings: settings,
             );
           default:

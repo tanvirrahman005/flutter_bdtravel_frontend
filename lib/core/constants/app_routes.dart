@@ -19,4 +19,5 @@ class AppRoutes {
   static const String transportRoutes = '/transport-routes';
   static const String schedules = '/schedules';
   static const String adminBookings = '/admin-bookings';
+  static const String adminDashboard = '/admin-dashboard';
 }
